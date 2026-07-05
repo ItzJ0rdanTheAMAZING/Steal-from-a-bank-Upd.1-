@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-select=none">
+    <title>3D Bank Stealing Simulator: Tactical Defcon Edition</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: #010103;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            display: block;
+        }
+
+        /* HUD Overlays */
+        .hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-size: 1.1rem;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .hud-card {
+            margin-bottom: 8px;
+            background: rgba(4, 4, 10, 0.9);
+            padding: 10px 18px;
+            border-radius: 8px;
+            border: 1px solid rgba(0, 255, 204, 0.25);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+            backdrop-filter: blur(4px);
+        }
+
+        .hud-title {
+            font-size: 0.7rem;
+            color: #aaa;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 2px;
+        }
+
+        .hud-value {
+            font-weight: bold;
+            font-size: 1.35rem;
+        }
+
+        #hud-money { color: #2ecc71; text-shadow: 0 0 8px rgba(46,204,113,0.3); }
+        #hud-level { color: #e74c3c; text-shadow: 0 0 8px rgba(231,76,60,0.3); }
+        #hud-objective { color: #f1c40f; font-size: 1rem; }
+
+        /* Retro Triangle-Square Cross D-PAD */
+        .dpad-container {
+            position: absolute;
+            bottom: 25px;
+            left: 25px;
+            display: grid;
+            grid-template-columns: repeat(3, 65px);
+            grid-template-rows: repeat(3, 65px);
+            gap: 8px;
+            background: rgba(0, 0, 0, 0.65);
+            padding: 12px;
+            border-radius: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
+            z-index: 10;
+            backdrop-filter: blur(5px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .dpad-btn {
+            background: rgba(255, 255, 255, 0.08);
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            border-radius: 12px;
+            font-size: 1.6rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.1s ease;
+        }
+
+        .dpad-btn:hover { background: rgba(255, 255, 255, 0.18); }
+        .dpad-btn:active {
+            background: #00ffcc;
+            color: #000;
+            box-shadow: 0 0 20px #00ffcc;
+            transform: scale(0.92);
+        }
+
+        #btn-up { grid-column: 2; grid-row: 1; }
+        #btn-left { grid-column: 1; grid-row: 2; }
+        #btn-right { grid-column: 3; grid-row: 2; }
+        #btn-down { grid-column: 2; grid-row: 3; }
+
+        /* Action Menu Buttons */
+        #shop-btn {
+            position: absolute;
+            bottom: 25px;
+            right: 25px;
+            padding: 18px 35px;
+            font-size: 1.15rem;
+            background: linear-gradient(135deg, #9b59b6, #8e44ad);
+            color: white;
+            border: none;
+            border-radius: 14px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 6px 20px rgba(142, 68, 173, 0.4);
+            transition: transform 0.2s;
+            z-index: 10;
+        }
+
+        #shop-btn:hover { transform: translateY(-3px); box-shadow: 0 8px 25px rgba(142, 68, 173, 0.6); }
+
+        /* Shop Modal */
+        #shop-modal {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(10, 8, 18, 0.98);
+            border: 2px solid #9b59b6;
+            border-radius: 16px;
+            padding: 30px;
+            color: white;
+            width: 370px;
+            box-shadow: 0 0 40px rgba(155, 89, 182, 0.4);
+            z-index: 20;
+            backdrop-filter: blur(10px);
+        }
+
+        .shop-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,0.15);
+            padding-bottom: 12px;
+            margin-bottom: 15px;
+        }
+
+        .shop-header h3 { margin: 0; color: #dfadfc; font-size: 1.35rem; }
+
+        .shop-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            background: rgba(255,255,255,0.04);
+            padding: 12px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .shop-item strong { display: block; font-size: 1rem; }
+        .shop-item small { color: #aaa; display: block; font-size: 0.8rem; margin-bottom: 4px; }
+        .shop-item span { color: #2ecc71; font-weight: bold; font-size: 0.95rem; }
+
+        .shop-item button {
+            background: #9b59b6;
+            color: white;
+            border: none;
+            padding: 8px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .shop-item button:hover { background: #8e44ad; }
+        .shop-item button:disabled { background: #333; color:#666; cursor: not-allowed; }
+
+        #close-shop { background: rgba(255,255,255,0.1); color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; }
+
+        /* End Game Screen Formats */
+        #alert-msg {
+            position: absolute;
+            top: 35%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 2.6rem;
+            font-weight: 900;
+            color: #e74c3c;
+            text-shadow: 0 0 15px rgba(231,76,60,0.6), 0 0 30px black;
+            display: none;
+            text-align: center;
+            pointer-events: none;
+            z-index: 15;
+            letter-spacing: 1px;
+        }
+
+        /* Cinematic Warning Text Overlay */
+        #cutscene-overlay {
+            display: none;
+            position: absolute;
+            top: 15%;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 3rem;
+            color: #ff2222;
+            font-weight: 900;
+            text-shadow: 0 0 20px #ff0000;
+            z-index: 25;
+            letter-spacing: 4px;
+            text-align: center;
+            animation: pulse 0.5s infinite alternate;
+        }
+
+        @keyframes pulse {
+            from { opacity: 0.3; transform: translateX(-50%) scale(0.95); }
+            to { opacity: 1; transform: translateX(-50%) scale(1.05); }
+        }
+
+        #end-screen {
+            display: none;
+            position: absolute;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(5, 5, 15, 0.95);
+            z-index: 30;
+            color: white;
+            text-align: center;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+    <div id="canvas-container"></div>
+
+    <div class="hud">
+        <div class="hud-card">
+            <div class="hud-title">Stolen Loot</div>
+            <div class="hud-value" id="hud-money">$0</div>
+        </div>
+        <div class="hud-card">
+            <div class="hud-title">Bank Security Rank</div>
+            <div class="hud-value" id="hud-level">Rank 1 / 25</div>
+        </div>
+        <div class="hud-card">
+            <div class="hud-title">Directives</div>
+            <div id="hud-objective">Avoid Traps & Cars: Empty the Vault Core!</div>
+        </div>
+    </div>
+
+    <div class="dpad-container">
+        <div class="dpad-btn" id="btn-up">▲</div>
+        <div class="dpad-btn" id="btn-left">◀</div>
+        <div class="dpad-btn" id="btn-right">▶</div>
+        <div class="dpad-btn" id="btn-down">▼</div>
+    </div>
+
+    <div id="alert-msg">SECURITY CRACKDOWN!<br><span style="font-size:1.3rem; font-weight:normal; color:#fff;">Drone Relocating...</span></div>
+    <div id="cutscene-overlay">⚠️ DEFCON 1 ACTIVE ⚠️<br><span style="font-size:1.5rem; color:#fff; font-weight:normal;">TACTICAL WARHEAD INBOUND</span></div>
+
+    <button id="shop-btn" onclick="toggleShop(true)">Talk to Timmy</button>
+
+    <div id="shop-modal">
+        <div class="shop-header">
+            <h3>Timmy's Black Market</h3>
+            <button id="close-shop" onclick="toggleShop(false)">X</button>
+        </div>
+        <p style="margin: 0 0 12px 0; font-size: 0.85rem; color: #dfadfc; font-style: italic;">
+            "Security is tight, man. Buy a Nuke to end this whole simulation instantly!"
+        </p>
+
+        <div class="shop-item">
+            <div>
+                <strong>Overclocked Propulsion</strong>
+                <small>Increases drone flight velocity (+15%)</small>
+                <span id="speed-cost">Cost: $100</span>
+            </div>
+            <button id="buy-speed" onclick="buyUpgrade('speed')">Purchase</button>
+        </div>
+
+        <div class="shop-item">
+            <div>
+                <strong>Bigger Duffle Bags</strong>
+                <small>Extracts more raw cash per robbery (+50%)</small>
+                <span id="bag-cost">Cost: $150</span>
+            </div>
+            <button id="buy-bag" onclick="buyUpgrade('bag')">Purchase</button>
+        </div>
+
+        <div class="shop-item" style="border: 1px solid #e74c3c; background: rgba(231,76,60,0.05);">
+            <div>
+                <strong style="color: #ff5555;">Tactical Nuke Strike</strong>
+                <small>Destroy the bank entirely. Instant Win.</small>
+                <span style="color: #e74c3c;">Cost: $10,000</span>
+            </div>
+            <button id="buy-nuke" style="background:#e74c3c;" onclick="buyUpgrade('nuke')">Launch</button>
+        </div>
+
+        <div style="text-align: center; color: #aaa; font-size: 0.85rem; margin-top: 12px;">
+            Liquid Assets: <span id="shop-money" style="color:#2ecc71; font-weight:bold;">$0</span>
+        </div>
+    </div>
+
+    <div id="end-screen">
+        <h1 id="end-title" style="font-size: 3.5rem; margin-bottom: 10px; text-shadow: 0 0 20px #00ffcc;">VICTORY Achieved!</h1>
+        <p id="end-desc" style="font-size: 1.4rem; color: #aaa; max-width: 500px; line-height: 1.5; margin-bottom: 25px;">
+            You have successfully bypassed Rank 25 security parameters and completely drained the vaults!
+        </p>
+        <button style="padding: 15px 35px; font-weight: bold; background: #00ffcc; border:none; border-radius: 8px; cursor:pointer;" onclick="location.reload()">Re-Infiltrate Matrix</button>
+    </div>
+
+    <script>
+        // --- GAME RUNTIME INSTANCE STATE ---
+        let config = {
+            money: 0,
+            speedLevel: 0,
+            bagLevel: 0,
+            baseSpeed: 0.18,
+            basePayout: 100,
+            heistLevel: 1
+        };
+
+        let currentSpeed = config.baseSpeed;
+        let holdingCore = false;
+        let gameFinished = false;
+
+        // Cinematic Cutscene State parameters
+        let cutsceneActive = false;
+        let cutsceneTimer = 0;
+        let nukeMesh = null;
+        let shockwaveMesh = null;
+
+        // --- GRAPHICS ENGINE RENDER STRUCT ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x020204);
+        scene.fog = new THREE.FogExp2(0x020204, 0.035);
+
+        const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        container.appendChild(renderer.domElement);
+
+        // --- SCENE LIGHTING MATRIX ---
+        const ambientLight = new THREE.AmbientLight(0x111122, 1.6);
+        scene.add(ambientLight);
+
+        const functionalLight = new THREE.DirectionalLight(0x9b59b6, 0.6);
+        functionalLight.position.set(5, 25, 5);
+        scene.add(functionalLight);
+
+        // --- WORLD GENERATION STRUCTS ---
+        const floorGeo = new THREE.PlaneGeometry(40, 110);
+        const floorMat = new THREE.MeshStandardMaterial({ color: 0x0a0a0d, roughness: 0.45 });
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.rotation.x = -Math.PI / 2;
+        floor.position.z = -25;
+        scene.add(floor);
+
+        const neonGrid = new THREE.GridHelper(110, 40, 0x9b59b6, 0x12121c);
+        neonGrid.position.set(0, 0.02, -25);
+        neonGrid.rotation.y = Math.PI / 2;
+        scene.add(neonGrid);
+
+        // Outer Enclosure Bounds
+        const boundaryMat = new THREE.MeshStandardMaterial({ color: 0x050508 });
+        const wallL = new THREE.Mesh(new THREE.BoxGeometry(1, 12, 110), boundaryMat);
+        wallL.position.set(-20.5, 6, -25);
+        scene.add(wallL);
+
+        const wallR = new THREE.Mesh(new THREE.BoxGeometry(1, 12, 110), boundaryMat);
+        wallR.position.set(20.5, 6, -25);
+        scene.add(wallR);
+
+        // Core Vault Partition Gate
+        const wallPartition = new THREE.Mesh(new THREE.BoxGeometry(40, 12, 2), new THREE.MeshStandardMaterial({color: 0x181a20, metalness: 0.5}));
+        wallPartition.position.set(0, 6, -65);
+        scene.add(wallPartition);
+
+        const doorGeo = new THREE.CylinderGeometry(5, 5, 1.2, 24);
+        const doorMat = new THREE.MeshStandardMaterial({color: 0x2b3340, metalness: 0.8});
+        const vaultDoor = new THREE.Mesh(doorGeo, doorMat);
+        vaultDoor.rotation.x = Math.PI / 2;
+        vaultDoor.position.set(0, 5.5, -64.2);
+        scene.add(vaultDoor);
+
+        // Vault Loot Core Asset
+        const coreGeo = new THREE.OctahedronGeometry(1.8, 0);
+        const coreMat = new THREE.MeshStandardMaterial({color: 0x2ecc71, emissive: 0x0b3d0f, roughness: 0.1, metalness: 0.9});
+        const vaultLootCore = new THREE.Mesh(coreGeo, coreMat);
+        vaultLootCore.position.set(0, 2.5, -73);
+        scene.add(vaultLootCore);
+
+        // Extraction Zone Pad
+        const extractionGeo = new THREE.BoxGeometry(12, 0.1, 8);
+        const extractionMat = new THREE.MeshBasicMaterial({color: 0x2ecc71, wireframe: true});
+        const extractionPad = new THREE.Mesh(extractionGeo, extractionMat);
+        extractionPad.position.set(0, 0.05, 22);
+        scene.add(extractionPad);
+
+        // Timmy Vendor Mesh Group Component
+        const timmyGroup = new THREE.Group();
+        const tHead = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.9, 0.9), new THREE.MeshStandardMaterial({color: 0x9b59b6, roughness: 0.2}));
+        tHead.position.y = 3.1;
+        timmyGroup.add(tHead);
+        const tVisor = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.18, 0.2), new THREE.MeshBasicMaterial({color: 0x00ffcc}));
+        tVisor.position.set(0, 3.1, 0.46);
+        timmyGroup.add(tVisor);
+        const tBody = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.4, 1.4, 8), new THREE.MeshStandardMaterial({color: 0x2c3e50, metalness: 0.6}));
+        tBody.position.y = 1.95;
+        timmyGroup.add(tBody);
+        const tBase = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.3, 0.3, 16), new THREE.MeshStandardMaterial({color: 0x1a1a1a}));
+        tBase.position.y = 0.15;
+        timmyGroup.add(tBase);
+        timmyGroup.position.set(9, 0, 20);
+        scene.add(timmyGroup);
+
+        // User Drone Unit
+        const playerGeo = new THREE.SphereGeometry(1.05, 32, 16);
+        const playerMat = new THREE.MeshStandardMaterial({ color: 0x0055ff, emissive: 0x001133, roughness: 0.2 });
+        const userDrone = new THREE.Mesh(playerGeo, playerMat);
+        userDrone.position.set(0, 1.05, 22); 
+        scene.add(userDrone);
+
+        // Hazard Management Arrays
+        let lasers = [];
+        let guards = [];
+        let landmines = [];
+        let mazeWalls = [];
+        let policeCars = [];
+
+        // --- PROCEDURAL ARCHITECT: SECURITY GRID RE-COMPILER ---
+        function generateThreatLayout() {
+            lasers.forEach(l => scene.remove(l.mesh));
+            guards.forEach(g => scene.remove(g.mesh));
+            landmines.forEach(m => scene.remove(m.mesh));
+            mazeWalls.forEach(w => scene.remove(w.mesh));
+            policeCars.forEach(c => scene.remove(c.mesh));
+
+            lasers = []; guards = []; landmines = []; mazeWalls = []; policeCars = [];
+
+            let scale = config.heistLevel;
+
+            // 1. Structural Maze Wall Generator segments
+            const mazeMaterial = new THREE.MeshStandardMaterial({color: 0x111622, roughness: 0.6});
+            let mazeConfigs = [
+                {x: -9, z: -25, w: 22, d: 3}, {x: 9, z: -38, w: 22, d: 3},
+                {x: -6, z: -50, w: 28, d: 3}, {x: 10, z: -15, w: 20, d: 3}
+            ];
+            mazeConfigs.forEach(wallConf => {
+                const wallMesh = new THREE.Mesh(new THREE.BoxGeometry(wallConf.w, 9, wallConf.d), mazeMaterial);
+                wallMesh.position.set(wallConf.x, 4.5, wallConf.z);
+                scene.add(wallMesh);
+                mazeWalls.push({ mesh: wallMesh, rx: wallConf.w/2, rz: wallConf.d/2 });
+            });
+
+            // 2. Transverse Security Lasers
+            let laserCount = Math.min(2 + scale, 8);
+            for(let i = 0; i < laserCount; i++) {
+                let zPos = -12 - (i * 6.5);
+                const lGeo = new THREE.CylinderGeometry(0.1, 0.1, 40);
+                const lMat = new THREE.MeshBasicMaterial({color: 0xff0044});
+                const lMesh = new THREE.Mesh(lGeo, lMat);
+                lMesh.rotation.z = Math.PI / 2;
+                lMesh.position.set(0, 0.5 + (Math.random() * 4), zPos);
+                scene.add(lMesh);
+
+                lasers.push({
+                    mesh: lMesh,
+                    speed: (0.04 + (Math.random() * 0.04)) * (1 + scale * 0.12),
+                    dir: Math.random() > 0.5 ? 1 : -1
+                });
+            }
+
+            // 3. Patrolling AI Guards
+            let guardCount = Math.min(2 + Math.floor(scale / 2), 6);
+            for(let i = 0; i < guardCount; i++) {
+                let zPos = -8 - (i * 10);
+                const gMesh = new THREE.Mesh(new THREE.BoxGeometry(2.2, 3.2, 2.2), new THREE.MeshStandardMaterial({color: 0xe67e22}));
+                gMesh.position.set((Math.random() * 24) - 12, 1.6, zPos);
+                scene.add(gMesh);
+
+                guards.push({
+                    mesh: gMesh,
+                    speed: (0.04 + (Math.random() * 0.04)) * (1 + scale * 0.08),
+                    dir: Math.random() > 0.5 ? 1 : -1,
+                    minX: -18, maxX: 18
+                });
+            }
+
+            // 4. Proximity Landmines
+            let mineCount = Math.min(3 + scale, 12);
+            for(let i = 0; i < mineCount; i++) {
+                const mMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.7, 0.25, 8), new THREE.MeshStandardMaterial({color: 0x333, emissive: 0xcc0000}));
+                mMesh.position.set((Math.random() * 32) - 16, 0.12, -10 - (Math.random() * 45));
+                scene.add(mMesh);
+                landmines.push({ mesh: mMesh });
+            }
+
+            // 5. Fast Intercepting Police Cruisers
+            let carCount = Math.min(1 + Math.floor(scale / 4), 3);
+            for(let i = 0; i < carCount; i++) {
+                let zPos = 6 + (i * 4.5);
+                const carMesh = new THREE.Mesh(new THREE.BoxGeometry(5, 2.5, 3), new THREE.MeshStandardMaterial({color: 0x0022cc}));
+                carMesh.position.set((Math.random() * 26) - 13, 1.25, zPos);
+                scene.add(carMesh);
+
+                const lightBar = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.4, 2.5), new THREE.MeshBasicMaterial({color: 0xff0000}));
+                lightBar.position.y = 1.4;
+                carMesh.add(lightBar);
+
+                policeCars.push({
+                    mesh: carMesh,
+                    light: lightBar,
+                    speed: (0.08 + (Math.random() * 0.06)) * (1 + scale * 0.06),
+                    dir: Math.random() > 0.5 ? 1 : -1
+                });
+            }
+        }
+
+        generateThreatLayout();
+
+        // --- DIRECTIVE ROUTERS ---
+        const activeMoves = { up: false, down: false, left: false, right: false };
+
+        window.addEventListener('keydown', (e) => {
+            if (cutsceneActive) return;
+            if(e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') activeMoves.up = true;
+            if(e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') activeMoves.down = true;
+            if(e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') activeMoves.left = true;
+            if(e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') activeMoves.right = true;
+        });
+        window.addEventListener('keyup', (e) => {
+            if(e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') activeMoves.up = false;
+            if(e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') activeMoves.down = false;
+            if(e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') activeMoves.left = false;
+            if(e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') activeMoves.right = false;
+        });
+
+        function routeArcadeInput(elementId, action) {
+            const node = document.getElementById(elementId);
+            const engage = (e) => { e.preventDefault(); if (!cutsceneActive) activeMoves[action] = true; };
+            const release = (e) => { e.preventDefault(); activeMoves[action] = false; };
+            node.addEventListener('mousedown', engage); node.addEventListener('mouseup', release); node.addEventListener('mouseleave', release);
+            node.addEventListener('touchstart', engage); node.addEventListener('touchend', release);
+        }
+        routeArcadeInput('btn-up', 'up'); routeArcadeInput('btn-down', 'down'); routeArcadeInput('btn-left', 'left'); routeArcadeInput('btn-right', 'right');
+
+        function processLocomotion() {
+            if (gameFinished || cutsceneActive) return;
+            
+            let dx = 0, dz = 0;
+            if (activeMoves.up) dz -= 1;
+            if (activeMoves.down) dz += 1;
+            if (activeMoves.left) dx -= 1;
+            if (activeMoves.right) dx += 1;
+
+            if(dx !== 0 || dz !== 0) {
+                let unitLen = Math.sqrt(dx*dx + dz*dz);
+                let stepX = (dx / unitLen) * currentSpeed;
+                let stepZ = (dz / unitLen) * currentSpeed;
+
+                let nextX = userDrone.position.x + stepX;
+                let nextZ = userDrone.position.z + stepZ;
+                let collides = false;
+
+                for (let wall of mazeWalls) {
+                    if (Math.abs(nextX - wall.mesh.position.x) < (wall.rx + 0.95) &&
+                        Math.abs(nextZ - wall.mesh.position.z) < (wall.rz + 0.95)) {
+                        collides = true;
+                        break;
+                    }
+                }
+
+                if (!collides) {
+                    userDrone.position.x = nextX;
+                    userDrone.position.z = nextZ;
+                }
+            }
+
+            if(userDrone.position.x < -18.8) userDrone.position.x = -18.8;
+            if(userDrone.position.x > 18.8) userDrone.position.x = 18.8;
+            if(userDrone.position.z > 26.0) userDrone.position.z = 26.0;
+            if(userDrone.position.z < -77.5) userDrone.position.z = -77.5;
+        }
+
+        // --- RULE PARADIGMS & EVALUATORS ---
+        function dropDroneToStart() {
+            userDrone.position.set(0, 1.05, 22);
+            holdingCore = false;
+            userDrone.material.color.setHex(0x0055ff);
+            userDrone.material.emissive.setHex(0x001133);
+            document.getElementById('hud-objective').innerText = "Evaded System. Empty the Vault Core!";
+            document.getElementById('hud-objective').style.color = "#f1c40f";
+        }
+
+        function flashBreachProtocol() {
+            document.getElementById('alert-msg').style.display = 'block';
+            setTimeout(() => document.getElementById('alert-msg').style.display = 'none', 1300);
+            dropDroneToStart();
+        }
+
+        // --- THE NUCLEAR CUTSCENE TRIGGERS ---
+        function startNuclearCutscene() {
+            cutsceneActive = true;
+            cutsceneTimer = 0;
+            toggleShop(false);
+            document.getElementById('cutscene-overlay').style.display = 'block';
+
+            // Generate 3D Warhead Model
+            const nukeGroup = new THREE.Group();
+            const body = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 5, 16), new THREE.MeshStandardMaterial({color: 0x333333, metalness: 0.8}));
+            const tip = new THREE.Mesh(new THREE.ConeGeometry(1.5, 2, 16), new THREE.MeshStandardMaterial({color: 0xcc0000, emissive: 0x330000}));
+            tip.position.y = 3.5;
+            nukeGroup.add(body);
+            nukeGroup.add(tip);
+
+            // Position high up in the foggy sky over center of map
+            nukeGroup.position.set(0, 80, -25);
+            nukeGroup.rotation.x = Math.PI; // Point downwards
+            scene.add(nukeGroup);
+            nukeMesh = nukeGroup;
+
+            // Prepare a hidden expanding energy shockwave shell
+            const shockGeo = new THREE.SphereGeometry(1, 32, 32);
+            const shockMat = new THREE.MeshBasicMaterial({color: 0xffaa00, wireframe: true, transparent: true, opacity: 0.7});
+            shockwaveMesh = new THREE.Mesh(shockGeo, shockMat);
+            shockwaveMesh.position.set(0, 0.2, -25);
+            shockwaveMesh.scale.set(0.1, 0.1, 0.1);
+            scene.add(shockwaveMesh);
+        }
+
+        function triggerVictoryState(nukeMethod = false) {
+            gameFinished = true;
+            document.getElementById('cutscene-overlay').style.display = 'none';
+            const screen = document.getElementById('end-screen');
+            screen.style.display = 'flex';
+            
+            if (nukeMethod) {
+                document.getElementById('end-title').innerText = "NUCLEAR ANNIHILATION!";
+                document.getElementById('end-title').style.color = "#e74c3c";
+                document.getElementById('end-desc').innerText = "You successfully launched Timmy's Tactical Warhead. The entire banking structure and its firewall security protocols were instantly vaporized into atoms!";
+            } else {
+                document.getElementById('end-title').innerText = "SIMULATION CONCLUDED!";
+                document.getElementById('end-title').style.color = "#00ffcc";
+                document.getElementById('end-desc').innerText = "Phenomenal performance. You successfully bypassed all Rank 25 high-security counter-measures and drained the banking reserve vaults!";
+            }
+        }
+
+        function syncUserInterface() {
+            document.getElementById('hud-money').innerText = `$${config.money}`;
+            document.getElementById('shop-money').innerText = `$${config.money}`;
+            document.getElementById('hud-level').innerText = `Rank ${config.heistLevel} / 25`;
+            
+            let speedCost = Math.round(100 * Math.pow(1.6, config.speedLevel));
+            let bagCost = Math.round(150 * Math.pow(1.6, config.bagLevel));
+            
+            document.getElementById('speed-cost').innerText = `Cost: $${speedCost}`;
+            document.getElementById('bag-cost').innerText = `Cost: $${bagCost}`;
+            
+            document.getElementById('buy-speed').disabled = config.money < speedCost;
+            document.getElementById('buy-bag').disabled = config.money < bagCost;
+            document.getElementById('buy-nuke').disabled = config.money < 10000;
+        }
+
+        function toggleShop(open) {
+            if(!gameFinished && !cutsceneActive) document.getElementById('shop-modal').style.display = open ? 'block' : 'none';
+        }
+
+        function buyUpgrade(type) {
+            if(type === 'speed') {
+                let cost = Math.round(100 * Math.pow(1.6, config.speedLevel));
+                if(config.money >= cost) {
+                    config.money -= cost; config.speedLevel++;
+                    currentSpeed = config.baseSpeed * (1 + config.speedLevel * 0.15);
+                }
+            } else if(type === 'bag') {
+                let cost = Math.round(150 * Math.pow(1.6, config.bagLevel));
+                if(config.money >= cost) { config.money -= cost; config.bagLevel++; }
+            } else if(type === 'nuke') {
+                if(config.money >= 10000) { config.money -= 10000; startNuclearCutscene(); }
+            }
+            syncUserInterface();
+        }
+
+        // --- MAIN PROCESSOR CYCLE ---
+        function runFrameCycle() {
+            requestAnimationFrame(runFrameCycle);
+            processLocomotion();
+
+            vaultLootCore.rotation.y += 0.025;
+            timmyGroup.position.y = Math.sin(Date.now() * 0.002) * 0.12;
+
+            // CAMERA PIPELINE CONTROL ROUTER
+            if (cutsceneActive) {
+                cutsceneTimer += 0.016; // Add frame delta estimation
+
+                if (nukeMesh && nukeMesh.position.y > 1.5) {
+                    // Phase 1: Missile Dropping. Camera tracks the warhead mid-air
+                    nukeMesh.position.y -= 0.75; 
+                    camera.position.set(20, nukeMesh.position.y + 12, -10);
+                    camera.lookAt(nukeMesh.position);
+                } else if (nukeMesh) {
+                    // Impact Collision point hit! Delete payload model geometry
+                    scene.remove(nukeMesh);
+                    nukeMesh = null;
+                } else if (shockwaveMesh && shockwaveMesh.scale.x < 70) {
+                    // Phase 2: Detonation! Blast shell expands dynamically across map
+                    let expandFactor = shockwaveMesh.scale.x + 1.2;
+                    shockwaveMesh.scale.set(expandFactor, expandFactor, expandFactor);
+                    
+                    // Flash intense environmental lighting colors
+                    functionalLight.intensity = 10.0;
+                    functionalLight.color.setHex(0xffaa00);
+                    scene.background.setHex(0x552200);
+
+                    // Camera violently backs away upwards to capture view of explosion radius
+                    camera.position.set(0, 45, 45);
+                    camera.lookAt(0, 0, -25);
+                } else {
+                    // Cutscene Complete -> Load Win Panel Layout screen
+                    triggerVictoryState(true);
+                }
+            } else {
+                // Standard Drone Isometric Tracking Camera Blueprint Mode
+                camera.position.set(userDrone.position.x, userDrone.position.y + 15, userDrone.position.z + 13);
+                camera.lookAt(userDrone.position.x, userDrone.position.y + 0.8, userDrone.position.z);
+            }
+
+            if (!gameFinished && !cutsceneActive) {
+                // 1. Evaluate transverse lasers
+                lasers.forEach(laser => {
+                    laser.mesh.position.y += laser.speed * laser.dir;
+                    if(laser.mesh.position.y > 5.0 || laser.mesh.position.y < 0.4) laser.dir *= -1;
+                    if(Math.abs(userDrone.position.z - laser.mesh.position.z) < 0.9 && Math.abs(userDrone.position.y - laser.mesh.position.y) < 1.0) {
+                        flashBreachProtocol();
+                    }
+                });
+
+                // 2. Evaluate Guard paths
+                guards.forEach(guard => {
+                    guard.mesh.position.x += guard.speed * guard.dir;
+                    if(guard.mesh.position.x > guard.maxX || guard.mesh.position.x < guard.minX) guard.dir *= -1;
+                    if(userDrone.position.distanceTo(guard.mesh.position) < 2.1) flashBreachProtocol();
+                });
+
+                // 3. Evaluate static Landmines proximity
+                landmines.forEach(mine => {
+                    if(userDrone.position.distanceTo(mine.mesh) < 1.4) flashBreachProtocol();
+                });
+
+                // 4. Move and evaluate Police Cruisers
+                policeCars.forEach(car => {
+                    car.mesh.position.x += car.speed * car.dir;
+                    car.light.material.color.setHex(Date.now() % 300 > 150 ? 0xff0000 : 0x0022ff);
+                    if(car.mesh.position.x > 18 || car.mesh.position.x < -18) car.dir *= -1;
+                    if(userDrone.position.distanceTo(car.mesh.position) < 2.6) flashBreachProtocol();
+                });
+
+                // 5. Check Objectives milestones
+                if(!holdingCore && userDrone.position.z < -67) {
+                    holdingCore = true;
+                    userDrone.material.color.setHex(0x2ecc71);
+                    userDrone.material.emissive.setHex(0x093310);
+                    document.getElementById('hud-objective').innerText = "VAULT SECURED! Dodge the police cruisers to reach safety!";
+                    document.getElementById('hud-objective').style.color = "#2ecc71";
+                }
+
+                if(holdingCore && userDrone.position.z > 17 && Math.abs(userDrone.position.x) < 6) {
+                    config.money += Math.round(config.basePayout * (1 + config.bagLevel * 0.5));
+                    config.heistLevel++;
+                    
+                    if (config.heistLevel >= 25) {
+                        triggerVictoryState(false);
+                    } else {
+                        generateThreatLayout();
+                        dropDroneToStart();
+                        syncUserInterface();
+                    }
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        syncUserInterface();
+        runFrameCycle();
+    </script>
+</body>
+</html>
